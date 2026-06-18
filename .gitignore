@@ -1,0 +1,6 @@
+*.jpg
+*.jpeg
+*.png
+*.pyc
+__pycache__/
+.trae
