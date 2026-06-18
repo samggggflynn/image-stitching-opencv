@@ -45,34 +45,36 @@ def visualize_centercut_steps(img_top, img_bottom, overlap_ratio=0.2, shift_y=No
     total_h = h1 + h2 - overlap_h
     
     # 步骤2：计算关键位置
-    bottom_start = h1 - overlap_h  # 重叠区域开始位置
-    overlap_center = bottom_start + overlap_h // 2  # 中心切割位置
+    overlap_start_top = h1 - overlap_h  # 重叠区域在上图中的起始位置
+    cut_position = h1 - overlap_h // 2  # 中心切割位置（在输出图像中的位置）
     
     # 步骤3：先创建拼接结果
     result = np.zeros((total_h, w1, 3), dtype=np.uint8)
     
-    # 放置上图
+    # 放置上图（完整放置）
     result[:h1, :w1] = img_top
     
-    # 放置下图
-    actual_bottom_start = min(overlap_center, total_h - h2)
-    actual_bottom_start = max(0, actual_bottom_start)
-    result[actual_bottom_start:actual_bottom_start + h2, :w1] = img_bottom
+    # 放置下图（从切割位置开始）
+    bottom_end = min(cut_position + h2, total_h)
+    result[cut_position:bottom_end, :w1] = img_bottom[:bottom_end - cut_position, :]
     
     # 渐变融合
-    blend_start = max(bottom_start, overlap_center - blend_width)
-    blend_end = min(bottom_start + overlap_h, overlap_center + blend_width)
+    blend_start = max(overlap_start_top, cut_position - blend_width)
+    blend_end = min(cut_position + overlap_h // 2, cut_position + blend_width)
     
     if blend_start < blend_end:
         for y in range(blend_start, blend_end):
-            y_in_blend = y - (overlap_center - blend_start)
-            if y_in_blend < 0:
-                alpha = 1.0 - abs(y_in_blend) / blend_width
+            # 计算权重：切割线上方上图权重高，下方下图权重高
+            y_in_blend = y - (cut_position - blend_width)
+            if y_in_blend < blend_width:
+                # 切割线上方：上图权重从1逐渐降低
+                alpha = y_in_blend / (2 * blend_width)
             else:
-                alpha = y_in_blend / blend_width
+                # 切割线下方：下图权重逐渐增加
+                alpha = 1.0 - (2 * blend_width - y_in_blend) / (2 * blend_width)
             
             y_top = y
-            y_bottom = y - actual_bottom_start
+            y_bottom = y - cut_position
             
             if 0 <= y_top < h1 and 0 <= y_bottom < h2:
                 result[y, :] = (
@@ -122,8 +124,9 @@ def visualize_centercut_steps(img_top, img_bottom, overlap_ratio=0.2, shift_y=No
         f"  - Height: {overlap_h} px",
         "",
         f"Step 2: Center Cut Position",
-        f"  - Overlap Start: Y={bottom_start}",
-        f"  - Cut Line: Y={overlap_center}",
+        f"  - Overlap Start (in Top): Y={overlap_start_top}",
+        f"  - Center Cut Line: Y={cut_position}",
+        f"  - Overlap End: Y={cut_position + overlap_h // 2}",
         "",
         f"Step 3: Blend",
         f"  - Blend Width: {blend_width} px",
@@ -140,21 +143,21 @@ def visualize_centercut_steps(img_top, img_bottom, overlap_ratio=0.2, shift_y=No
     
     # Draw key position lines on result
     # Overlap start line (blue)
-    cv2.line(canvas, (x_offset, result_y + bottom_start), 
-             (x_offset + w1, result_y + bottom_start), (255, 0, 0), 1)
-    cv2.putText(canvas, 'Overlap Start', (x_offset + w1 + 5, result_y + bottom_start - 5), 
+    cv2.line(canvas, (x_offset, result_y + overlap_start_top), 
+             (x_offset + w1, result_y + overlap_start_top), (255, 0, 0), 1)
+    cv2.putText(canvas, 'Overlap Start', (x_offset + w1 + 5, result_y + overlap_start_top - 5), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 0, 0), 1)
     
     # Center cut line (red)
-    cv2.line(canvas, (x_offset, result_y + overlap_center), 
-             (x_offset + w1, result_y + overlap_center), (0, 0, 255), 2)
-    cv2.putText(canvas, 'Center Cut', (x_offset + w1 + 5, result_y + overlap_center - 5), 
+    cv2.line(canvas, (x_offset, result_y + cut_position), 
+             (x_offset + w1, result_y + cut_position), (0, 0, 255), 2)
+    cv2.putText(canvas, 'Center Cut', (x_offset + w1 + 5, result_y + cut_position - 5), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
     
     # Overlap end line (blue)
-    cv2.line(canvas, (x_offset, result_y + bottom_start + overlap_h), 
-             (x_offset + w1, result_y + bottom_start + overlap_h), (255, 0, 0), 1)
-    cv2.putText(canvas, 'Overlap End', (x_offset + w1 + 5, result_y + bottom_start + overlap_h - 5), 
+    cv2.line(canvas, (x_offset, result_y + cut_position + overlap_h // 2), 
+             (x_offset + w1, result_y + cut_position + overlap_h // 2), (255, 0, 0), 1)
+    cv2.putText(canvas, 'Overlap End', (x_offset + w1 + 5, result_y + cut_position + overlap_h // 2 - 5), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 0, 0), 1)
     
     # Blend area (green box)

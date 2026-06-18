@@ -166,24 +166,30 @@ class CenterCutStitcher(BaseVerticalStitcher):
             adjusted_overlap = int(overlap_h + shift_y)
             overlap_h = max(int(min(h1, h2) * 0.1), min(adjusted_overlap, int(min(h1, h2) * 0.5)))
         
+        # 计算关键位置
+        # 重叠区域在上图中的起始位置
+        overlap_start_top = h1 - overlap_h
+        # 中心切割位置（在输出图像中的位置）
+        cut_position = h1 - overlap_h // 2
+        
+        # 计算输出尺寸
+        # 上图占据 [0, cut_position)
+        # 下图占据 [cut_position, cut_position + h2)
+        # 但是下图的前 overlap_h/2 像素与上图的后 overlap_h/2 像素重叠
+        # 所以总高度是 h1 + h2 - overlap_h
         total_h = h1 + h2 - overlap_h
         
         # 创建输出图像
         result = np.zeros((total_h, w1, 3), dtype=np.uint8)
         
-        # 计算关键位置
-        # 重叠区域在上图中的起始位置
-        overlap_start_top = h1 - overlap_h
-        # 重叠区域在下图中的起始位置
-        overlap_start_bottom = 0
-        # 中心切割位置（在输出图像中的位置）
-        cut_position = h1 - overlap_h // 2
-        
-        # 放置上图（只放置到切割位置）
-        result[:cut_position, :w1] = img_top[:cut_position, :]
+        # 放置上图（完整放置）
+        result[:h1, :w1] = img_top
         
         # 放置下图（从切割位置开始）
-        result[cut_position:cut_position + h2, :w1] = img_bottom
+        # 注意：下图的前 overlap_h/2 像素会与上图的后 overlap_h/2 像素重叠
+        # 我们需要确保下图不会超出输出图像的边界
+        bottom_end = min(cut_position + h2, total_h)
+        result[cut_position:bottom_end, :w1] = img_bottom[:bottom_end - cut_position, :]
         
         # 在切割线附近进行渐变融合
         # 融合区域：切割线上下各 blend_width 像素
