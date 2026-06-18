@@ -106,14 +106,16 @@ def main():
             logger.error("拼接失败")
     
     elif args.mode == 'centercut':
-        # 使用中心切割拼接器
+        # 使用中心切割拼接器（支持手动偏移）
         stitcher = CenterCutStitcher()
-        success, result = stitcher.stitch(img_top, img_bottom)
+        success, result = stitcher.stitch(img_top, img_bottom, shift_y=args.shift)
         
         if success:
             cv2.imwrite(str(args.output), result)
             logger.info(f"结果已保存到: {args.output}")
             logger.info(f"输出尺寸: {result.shape[1]} x {result.shape[0]}")
+            if args.shift is not None:
+                logger.info(f"手动指定的偏移量: {args.shift} 像素")
         else:
             logger.error("拼接失败")
     
