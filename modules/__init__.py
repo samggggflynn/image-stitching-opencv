@@ -6,6 +6,7 @@ from .status import get_status_message
 from .vertical import (
     BaseVerticalStitcher,
     SimpleStitcher,
+    CenterCutStitcher,
     FeatureBasedStitcher,
     TranslationStitcher,
     AutoVerticalStitcher,
@@ -19,6 +20,7 @@ __all__ = [
     'get_status_message',
     'BaseVerticalStitcher',
     'SimpleStitcher',
+    'CenterCutStitcher',
     'FeatureBasedStitcher',
     'TranslationStitcher',
     'AutoVerticalStitcher',

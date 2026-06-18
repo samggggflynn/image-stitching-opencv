@@ -123,6 +123,57 @@ class SimpleStitcher(BaseVerticalStitcher):
         return True, result
 
 
+class CenterCutStitcher(BaseVerticalStitcher):
+    """中心切割拼接器（重叠区域中间分割）"""
+    
+    def __init__(self, overlap_ratio=0.2):
+        """
+        Args:
+            overlap_ratio: 重叠区域比例 (0.1-0.5)
+        """
+        self.overlap_ratio = overlap_ratio
+    
+    def stitch(self, img_top, img_bottom):
+        """
+        执行中心切割拼接：
+        - 重叠区域的上半部分使用上图的像素
+        - 重叠区域的下半部分使用下图的像素
+        """
+        img_top, img_bottom = self.align_width(img_top, img_bottom)
+        
+        h1, w1 = img_top.shape[:2]
+        h2, w2 = img_bottom.shape[:2]
+        
+        # 计算重叠区域
+        overlap_h = int(min(h1, h2) * self.overlap_ratio)
+        total_h = h1 + h2 - overlap_h
+        
+        # 创建输出图像
+        result = np.zeros((total_h, w1, 3), dtype=np.uint8)
+        
+        # 放置上图（完整放置）
+        result[:h1, :w1] = img_top
+        
+        # 计算重叠区域的中心点
+        bottom_start = h1 - overlap_h
+        overlap_center = bottom_start + overlap_h // 2
+        
+        # 计算下图的实际起始位置（确保不超出边界）
+        # 下图从重叠中心开始，但要保证能完全放入输出图像
+        actual_bottom_start = min(overlap_center, total_h - h2)
+        actual_bottom_start = max(0, actual_bottom_start)
+        
+        # 放置下图
+        result[actual_bottom_start:actual_bottom_start + h2, :w1] = img_bottom
+        
+        # 注意：这里不进行渐变融合，而是直接硬切割
+        # 重叠区域上半部分（bottom_start 到 overlap_center）保持上图像素
+        # 重叠区域下半部分（overlap_center 到 bottom_start + overlap_h）使用下图像素
+        
+        logger.info(f"中心切割拼接完成: {w1} x {total_h} (重叠高度: {overlap_h}, 切割位置: {overlap_center})")
+        return True, result
+
+
 class FeatureBasedStitcher(BaseVerticalStitcher):
     """基于特征匹配的竖向拼接器"""
     
@@ -412,6 +463,7 @@ class AutoVerticalStitcher(BaseVerticalStitcher):
         self.feature_stitcher = FeatureBasedStitcher()
         self.translation_stitcher = TranslationStitcher()
         self.simple_stitcher = SimpleStitcher()
+        self.center_cut_stitcher = CenterCutStitcher()
     
     def stitch(self, img_top, img_bottom, mode='auto'):
         """
@@ -420,7 +472,7 @@ class AutoVerticalStitcher(BaseVerticalStitcher):
         Args:
             img_top: 上面的图像
             img_bottom: 下面的图像
-            mode: 'auto'自动选择, 'feature'特征匹配, 'translation'平移矩阵, 'simple'简单拼接
+            mode: 'auto'自动选择, 'feature'特征匹配, 'translation'平移矩阵, 'simple'简单拼接, 'centercut'中心切割
         
         Returns:
             (success, result)
@@ -438,6 +490,9 @@ class AutoVerticalStitcher(BaseVerticalStitcher):
         
         if mode == 'simple':
             return self.simple_stitcher.stitch(img_top, img_bottom)
+        
+        if mode == 'centercut':
+            return self.center_cut_stitcher.stitch(img_top, img_bottom)
         
         # auto 模式：依次尝试各种算法
         logger.info("自动选择拼接算法...")

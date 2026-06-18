@@ -18,7 +18,7 @@ from pathlib import Path
 import logging
 
 # 导入模块化的拼接器
-from modules import AutoVerticalStitcher, TranslationStitcher
+from modules import AutoVerticalStitcher, TranslationStitcher, CenterCutStitcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,9 +55,9 @@ def main():
     # 算法选择
     parser.add_argument(
         "--mode", "-m",
-        choices=['auto', 'feature', 'translation', 'simple'],
+        choices=['auto', 'feature', 'translation', 'simple', 'centercut'],
         default='auto',
-        help="拼接算法模式"
+        help="拼接算法模式: auto(自动), feature(特征匹配), translation(平移矩阵), simple(简单拼接), centercut(中心切割)"
     )
     
     # 平移矩阵模式的额外参数
@@ -102,6 +102,18 @@ def main():
             logger.info(f"输出尺寸: {result.shape[1]} x {result.shape[0]}")
             if estimated_shift is not None:
                 logger.info(f"自动检测的偏移量: {estimated_shift:.1f} 像素")
+        else:
+            logger.error("拼接失败")
+    
+    elif args.mode == 'centercut':
+        # 使用中心切割拼接器
+        stitcher = CenterCutStitcher()
+        success, result = stitcher.stitch(img_top, img_bottom)
+        
+        if success:
+            cv2.imwrite(str(args.output), result)
+            logger.info(f"结果已保存到: {args.output}")
+            logger.info(f"输出尺寸: {result.shape[1]} x {result.shape[0]}")
         else:
             logger.error("拼接失败")
     
